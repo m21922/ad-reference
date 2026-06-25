@@ -1,0 +1,44 @@
+name: 광고 레퍼런스 자동 수집
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 매일 UTC 01:00 = KST 10:00
+  workflow_dispatch:        # 수동 실행 버튼도 제공
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 의존성 설치
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: 기존 데이터 복원
+        run: |
+          mkdir -p output/screenshots
+          # ads_data.json이 없으면 빈 배열로 초기화
+          if [ ! -f output/ads_data.json ]; then
+            echo "[]" > output/ads_data.json
+          fi
+
+      - name: 광고 수집 실행
+        run: python collect_ads.py
+
+      - name: 결과 커밋 & 푸시
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/ads_data.json output/viewer.html output/screenshots/
+          git diff --staged --quiet || git commit -m "📦 광고 수집 $(date +'%Y-%m-%d')"
+          git push
